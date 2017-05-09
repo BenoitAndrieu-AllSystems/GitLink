@@ -14,6 +14,7 @@ namespace GitLink
     using Catel.Logging;
     using GitTools;
     using Providers;
+    using System.IO;
 
     public class Context : RepositoryContext
     {
@@ -33,6 +34,7 @@ namespace GitLink
             PlatformName = "AnyCPU";
             IncludedProjects = new List<string>();
             IgnoredProjects = new List<string>();
+            NoSolutionFile = false;
         }
 
 		public bool DownloadWithPowershell { get; set; }
@@ -95,6 +97,8 @@ namespace GitLink
 
         public string SolutionFile { get; set; }
 
+        public bool NoSolutionFile { get; set; }
+
         public List<string> IncludedProjects { get; private set; }
 
         public List<string> IgnoredProjects { get; private set; }
@@ -105,7 +109,12 @@ namespace GitLink
         {
             if (!string.IsNullOrWhiteSpace(SolutionDirectory))
             {
-                SolutionDirectory = Path.GetFullPath(SolutionDirectory, Environment.CurrentDirectory);
+                if (PdbExtensions.GetProperDirectoryCapitalization(new DirectoryInfo(Catel.IO.Path.GetFullPath(SolutionDirectory, Environment.CurrentDirectory)), out string path) == false)
+                {
+                    throw Log.ErrorAndCreateException<GitLinkException>("Solution directory does not exist");
+                }
+
+                SolutionDirectory = path;
             }
 
             if (string.IsNullOrEmpty(SolutionDirectory))

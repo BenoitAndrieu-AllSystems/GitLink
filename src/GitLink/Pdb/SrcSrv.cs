@@ -34,7 +34,17 @@ namespace GitLink.Pdb
                     sw.WriteLine("VERSION=2");
                     sw.WriteLine("SRCSRV: variables ------------------------------------------");                    
                     sw.WriteLine("RAWURL={0}", CreateTarget(rawUrl, revision));
-                    if(downloadWithPowershell)
+                    if (rawUrl.ToLowerInvariant().StartsWith("git://") == true)
+                    {
+                        sw.WriteLine("TRGFILE=%fnbksl%(%targ%\\%var2%)");
+                        sw.WriteLine("TMPZIP=%fnbksl%(%targ%\\%fnfile%(%var2%)).zip");
+                        sw.WriteLine("SRCSRVTRG=%TRGFILE%");
+                        sw.WriteLine("CMDGITARCHIVE=git.exe archive --format zip --remote %RAWURL% -o \"%TMPZIP%\"");
+                        sw.WriteLine("CMDUNZIP=powershell invoke-command -scriptblock {}; Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::ExtractToDirectory('%TMPZIP%', '%targ%');");
+                        sw.WriteLine("CMDDELZIP=del \"%TMPZIP%\"\"");
+                        sw.WriteLine("SRCSRVCMD=cmd /c \"%CMDGITARCHIVE% && %CMDUNZIP% && %CMDDELZIP%");
+                    }
+                    else if(downloadWithPowershell)
                     {
                         sw.WriteLine("TRGFILE=%fnbksl%(%targ%%var2%)");
                         sw.WriteLine("SRCSRVTRG=%TRGFILE%");

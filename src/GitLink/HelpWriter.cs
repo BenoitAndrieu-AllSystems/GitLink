@@ -29,9 +29,10 @@ Note that the solution must be built because this application will update existi
 
 GitLink [solutionPath] -u [urlToRepository]
 
-    solutionPath       The directory containing the solution with the pdb files.
+    solutionPath       The root directory of the git repository.
     -u [url]           Url to remote git repository.
-    -f [file]          Solution file name.
+    -f [file]          Relative path to a specific solution to use.
+    -nosolution       No solution will be used. Pdbs will be found in the directory given with -d switch. Switches unused : -c -p
     -c [config]        Name of the configuration, default value is 'Release'.
     -p [platform]      Name of the platform, default value is 'AnyCPU'.
     -b [branch]        Name of the branch to use on the remote repository.

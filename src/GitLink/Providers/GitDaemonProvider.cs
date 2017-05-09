@@ -34,7 +34,7 @@
 
             if (url.Contains(FileNamePlaceHolder))
             {
-                _rawUrl = url.Replace(FileNamePlaceHolder, "%var2%");
+                _rawUrl = url.Replace(FileNamePlaceHolder, "\"%var2%\"");
             }
 
             if (url.Contains(RevisionPlaceHolder))

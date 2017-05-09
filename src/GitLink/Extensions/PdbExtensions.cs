@@ -12,6 +12,7 @@ namespace GitLink
     using System.Linq;
     using Catel;
     using Pdb;
+    using System.IO;
 
     public static class PdbExtensions
     {
@@ -20,15 +21,15 @@ namespace GitLink
             Argument.IsNotNull(() => pdbFile);
 
             var missing = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            var actualFileChecksums = (from x in files
-                                       select new KeyValuePair<string, string>(Hex.Encode(Crypto.GetMd5HashForFiles(new[] { x }).First().Item1), x)).ToDictionary(x => x.Value, x => x.Key);
+            var actualFileChecksums = files == null ? null : (from x in files
+                                                              select new KeyValuePair<string, string>(Hex.Encode(Crypto.GetMd5HashForFiles(new[] { x }).First().Item1), x)).ToDictionary(x => x.Value, x => x.Key);
 
             foreach (var checksumInfo in pdbFile.GetChecksums())
             {
                 var file = checksumInfo.Key;
                 var checksum = checksumInfo.Value;
 
-                if (!actualFileChecksums.ContainsValue(checksum))
+                if (actualFileChecksums == null || !actualFileChecksums.ContainsValue(checksum))
                 {
                     if (file.EndsWith(".xaml"))
                     {
@@ -36,11 +37,93 @@ namespace GitLink
                         continue;
                     }
 
-                    missing[file] = checksum;
+                    if (GetProperFilePathCapitalization(file, out string path) == false)
+                    {
+                        continue;
+                    }
+
+                    missing[path] = checksum;
                 }
             }
 
             return missing;
+        }
+
+        public static bool GetProperDirectoryCapitalization(DirectoryInfo dirInfo, out string path)
+        {
+            DirectoryInfo parentDirInfo = dirInfo.Parent;
+            if (null == parentDirInfo)
+            {
+                path = dirInfo.Name;
+                if (path.Length == 3 && path[1] == ':')
+                {
+                    path = path.ToLowerInvariant();
+                }
+
+                return true;
+            }
+
+            DirectoryInfo[] dirs;
+            try
+            {
+                dirs = parentDirInfo.GetDirectories(dirInfo.Name);
+            }
+            catch (IOException)
+            {
+                path = null;
+                return false;
+            }
+
+            if (GetProperDirectoryCapitalization(parentDirInfo, out string parentPath) == false)
+            {
+                path = null;
+                return false;
+            }
+
+            if (dirs.Length == 0)
+            {
+                path = null;
+                return false;
+            }
+
+            path = Path.Combine(parentPath, dirs[0].Name);
+            return true;
+        }
+
+        public static bool GetProperFilePathCapitalization(string filename, out string path)
+        {
+            FileInfo fileInfo;
+            try
+            {
+                fileInfo = new FileInfo(filename);
+            }
+            catch (NotSupportedException)
+            {
+                path = null;
+                return false;
+            }
+            catch (ArgumentException)
+            {
+                path = null;
+                return false;
+            }
+
+            DirectoryInfo dirInfo = fileInfo.Directory;
+            if (GetProperDirectoryCapitalization(dirInfo, out string dirpath) == false)
+            {
+                path = null;
+                return false;
+            }
+
+            var files = dirInfo.GetFiles(fileInfo.Name);
+            if (files.Length == 0)
+            {
+                path = null;
+                return false;
+            }
+
+            path = Path.Combine(dirpath, files[0].Name);
+            return true;
         }
 
         public static Dictionary<string, string> GetChecksums(this PdbFile pdbFile)
@@ -51,7 +134,7 @@ namespace GitLink
 
             foreach (var file in pdbFile.GetFiles())
             {
-                checksums.Add(file.Item1, Hex.Encode(file.Item2));
+                checksums.Add(file.Item1, file.Item2 == null ? null : Hex.Encode(file.Item2));
             }
 
             return checksums;
@@ -61,12 +144,18 @@ namespace GitLink
         {
             Argument.IsNotNull(() => pdbFile);
 
+            if (pdbFile.SrcToolFiles != null)
+            {
+                return new List<Tuple<string, byte[]>>(pdbFile.SrcToolFiles);
+            }
+
+            var results = new List<Tuple<string, byte[]>>();
+
             //const int LastInterestingByte = 47;
             const string FileIndicator = "/src/files/";
 
             var values = pdbFile.Info.NameToPdbName.Values;
 
-            var results = new List<Tuple<string, byte[]>>();
             foreach (var value in values)
             {
                 if (!value.Name.Contains(FileIndicator))
@@ -87,7 +176,7 @@ namespace GitLink
                 var buffer = new byte[16];
                 for (int i = 72; i < 88; i++)
                 {
-                    buffer[i-72] = bytes[i];
+                    buffer[i - 72] = bytes[i];
                 }
 
                 results.Add(new Tuple<string, byte[]>(name, buffer));

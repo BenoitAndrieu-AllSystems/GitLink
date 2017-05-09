@@ -26,12 +26,17 @@
         private readonly SortedSet<int> _freePages;
         private readonly byte[] _zerosPage;
 
-        public PdbFile(string path)
+        public PdbFile(string path, string srctoolFile)
         {
             Argument.IsNotNullOrWhitespace(() => path);
 
             Path = path;
- 
+
+            if (string.IsNullOrEmpty(srctoolFile) == false)
+            {
+                SrcToolFiles = SrcToolHelper.Execute(srctoolFile, path);
+            }
+
             _fs = File.Open(path, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite);
             _br = new BinaryReader(_fs, Encoding.UTF8, true);
             _bw = new BinaryWriter(_fs, Encoding.UTF8, true);
@@ -44,6 +49,8 @@
             _freePages = new SortedSet<int>();
             _zerosPage = new byte[_pageByteCount];
         }
+
+        public IEnumerable<Tuple<string, byte[]>> SrcToolFiles { get; private set; }
 
         public string Path { get; private set; }
 
@@ -278,15 +285,17 @@
                         }
 
                         var flag = flags[flagIndex];
-                        if ((flag & (1 << (i % 32))) != 0)
+                        if ((flag & (1 << (i % 32))) == 0)
                         {
-                            var position = br.ReadInt32();
-                            var name = new PdbName();
-                            name.FlagIndex = i;
-                            name.Stream = br.ReadInt32();
-
-                            positions.Add(new Tuple<int, PdbName>(position, name));
+                            continue;
                         }
+
+                        var position = br.ReadInt32();
+                        var name = new PdbName();
+                        name.FlagIndex = i;
+                        name.Stream = br.ReadInt32();
+
+                        positions.Add(new Tuple<int, PdbName>(position, name));
                     }
 
                     if (positions.Count != nameCount)
@@ -295,7 +304,7 @@
                     }
 
                     var tailByteCount = GetRoot().Streams[1].ByteCount - br.BaseStream.Position;
-                    info.Tail = br.ReadBytes((int) tailByteCount);
+                    info.Tail = br.ReadBytes((int)tailByteCount);
 
                     foreach (var tuple in positions)
                     {

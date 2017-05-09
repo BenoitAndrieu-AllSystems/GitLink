@@ -51,94 +51,158 @@ namespace GitLink
                 var pdbStrFile = temporaryFilesContext.GetFile("pdbstr.exe");
                 ResourceHelper.ExtractEmbeddedResource("GitLink.Resources.Files.pdbstr.exe", pdbStrFile);
 
+                Log.Info("Extracting embedded srctool.exe");
+
+                var srctoolFile = temporaryFilesContext.GetFile("srctool.exe");
+                ResourceHelper.ExtractEmbeddedResource("GitLink.Resources.Files.srctool.exe", srctoolFile);
+
                 try
                 {
-                    var projects = new List<Project>();
-                    string[] solutionFiles;
-                    if (string.IsNullOrEmpty(context.SolutionFile))
+                    if (context.NoSolutionFile == true)
                     {
-                        solutionFiles = Directory.GetFiles(context.SolutionDirectory, "*.sln", SearchOption.AllDirectories);
-                    }
-                    else
-                    {
-                        var pathToSolutionFile = Path.Combine(context.SolutionDirectory, context.SolutionFile);
-                        if (!File.Exists(pathToSolutionFile))
+                        if (string.IsNullOrEmpty(context.PdbFilesDirectory) == true)
                         {
-                            Log.Error("Could not find solution file: {0}", pathToSolutionFile);
+                            Log.Error("PdbFilesDirectory not defined");
                             return -1;
                         }
 
-                        solutionFiles = new[] { pathToSolutionFile };
-                    }
-
-                    foreach (var solutionFile in solutionFiles)
-                    {
-                        var solutionProjects = ProjectHelper.GetProjects(solutionFile, context.ConfigurationName, context.PlatformName);
-                        projects.AddRange(solutionProjects);
-                    }
-
-                    var provider = context.Provider;
-                    if (provider == null)
-                    {
-                        throw Log.ErrorAndCreateException<GitLinkException>("Cannot find a matching provider for '{0}'", context.TargetUrl);
-                    }
-
-                    Log.Info("Using provider '{0}'", provider.GetType().Name);
-
-                    var shaHash = context.Provider.GetShaHashOfCurrentBranch(context, temporaryFilesContext);
-
-                    Log.Info("Using commit sha '{0}' as version stamp", shaHash);
-
-                    var projectCount = projects.Count();
-                    var failedProjects = new List<Project>();
-                    Log.Info("Found '{0}' project(s)", projectCount);
-                    Log.Info(string.Empty);
-
-                    foreach (var project in projects)
-                    {
-                        try
+                        var provider = context.Provider;
+                        if (provider == null)
                         {
-                            var projectName = project.GetProjectName();
-                            if (ProjectHelper.ShouldBeIgnored(projectName, context.IncludedProjects, context.IgnoredProjects))
+                            throw Log.ErrorAndCreateException<GitLinkException>("Cannot find a matching provider for '{0}'", context.TargetUrl);
+                        }
+
+                        Log.Info("Using provider '{0}'", provider.GetType().Name);
+
+                        var shaHash = context.Provider.GetShaHashOfCurrentBranch(context, temporaryFilesContext);
+
+                        Log.Info("Using commit sha '{0}' as version stamp", shaHash);
+
+                        var pdbFiles = Directory.GetFiles(context.PdbFilesDirectory, "*.pdb", SearchOption.AllDirectories).ToList();
+
+                        var failedPdbs = new HashSet<string>();
+                        foreach (var pdbFile in pdbFiles)
+                        {
+                            try
                             {
-                                Log.Info("Ignoring '{0}'", project.GetProjectName());
-                                Log.Info(string.Empty);
-                                continue;
+                                if (!LinkPdb(pdbFile, context, pdbStrFile, srctoolFile, shaHash, context.PdbFilesDirectory))
+                                {
+                                    failedPdbs.Add(pdbFile);
+                                }
+                            }
+                            catch
+                            {
+                                failedPdbs.Add(pdbFile);
+                            }
+                        }
+
+                        Log.Info("All pdbs are done. {0} of {1} succeeded", pdbFiles.Count - failedPdbs.Count, pdbFiles.Count);
+
+                        if (failedPdbs.Count > 0)
+                        {
+                            Log.Info(string.Empty);
+                            Log.Info("The following pdbs have failed:");
+                            Log.Indent();
+
+                            foreach (var failedPdb in failedPdbs)
+                            {
+                                Log.Info("* {0}", context.GetRelativePath(failedPdb));
                             }
 
-                            if (context.IsDebug)
+                            Log.Unindent();
+                        }
+
+                        exitCode = (failedPdbs.Count == 0) ? 0 : -1;
+                    }
+                    else
+                    {
+                        var projects = new List<Project>();
+                        string[] solutionFiles;
+                        if (string.IsNullOrEmpty(context.SolutionFile))
+                        {
+                            solutionFiles = Directory.GetFiles(context.SolutionDirectory, "*.sln", SearchOption.AllDirectories);
+                        }
+                        else
+                        {
+                            var pathToSolutionFile = Path.Combine(context.SolutionDirectory, context.SolutionFile);
+                            if (!File.Exists(pathToSolutionFile))
                             {
-                                project.DumpProperties();
+                                Log.Error("Could not find solution file: {0}", pathToSolutionFile);
+                                return -1;
                             }
 
-                            if (!LinkProject(context, project, pdbStrFile, shaHash, context.PdbFilesDirectory))
+                            solutionFiles = new[] { pathToSolutionFile };
+                        }
+
+                        foreach (var solutionFile in solutionFiles)
+                        {
+                            var solutionProjects = ProjectHelper.GetProjects(solutionFile, context.ConfigurationName, context.PlatformName);
+                            projects.AddRange(solutionProjects);
+                        }
+
+                        var provider = context.Provider;
+                        if (provider == null)
+                        {
+                            throw Log.ErrorAndCreateException<GitLinkException>("Cannot find a matching provider for '{0}'", context.TargetUrl);
+                        }
+
+                        Log.Info("Using provider '{0}'", provider.GetType().Name);
+
+                        var shaHash = context.Provider.GetShaHashOfCurrentBranch(context, temporaryFilesContext);
+
+                        Log.Info("Using commit sha '{0}' as version stamp", shaHash);
+
+                        var projectCount = projects.Count();
+                        var failedProjects = new List<Project>();
+                        Log.Info("Found '{0}' project(s)", projectCount);
+                        Log.Info(string.Empty);
+
+                        foreach (var project in projects)
+                        {
+                            try
+                            {
+                                var projectName = project.GetProjectName();
+                                if (ProjectHelper.ShouldBeIgnored(projectName, context.IncludedProjects, context.IgnoredProjects))
+                                {
+                                    Log.Info("Ignoring '{0}'", project.GetProjectName());
+                                    Log.Info(string.Empty);
+                                    continue;
+                                }
+
+                                if (context.IsDebug)
+                                {
+                                    project.DumpProperties();
+                                }
+
+                                if (!LinkProject(context, project, pdbStrFile, shaHash, context.PdbFilesDirectory))
+                                {
+                                    failedProjects.Add(project);
+                                }
+                            }
+                            catch (Exception)
                             {
                                 failedProjects.Add(project);
                             }
                         }
-                        catch (Exception)
+
+                        Log.Info("All projects are done. {0} of {1} succeeded", projectCount - failedProjects.Count, projectCount);
+
+                        if (failedProjects.Count > 0)
                         {
-                            failedProjects.Add(project);
-                        }
-                    }
+                            Log.Info(string.Empty);
+                            Log.Info("The following projects have failed:");
+                            Log.Indent();
 
-                    Log.Info("All projects are done. {0} of {1} succeeded", projectCount - failedProjects.Count, projectCount);
+                            foreach (var failedProject in failedProjects)
+                            {
+                                Log.Info("* {0}", context.GetRelativePath(failedProject.GetProjectName()));
+                            }
 
-                    if (failedProjects.Count > 0)
-                    {
-                        Log.Info(string.Empty);
-                        Log.Info("The following projects have failed:");
-                        Log.Indent();
-
-                        foreach (var failedProject in failedProjects)
-                        {
-                            Log.Info("* {0}", context.GetRelativePath(failedProject.GetProjectName()));
+                            Log.Unindent();
                         }
 
-                        Log.Unindent();
+                        exitCode = (failedProjects.Count == 0) ? 0 : -1;
                     }
-
-                    exitCode = (failedProjects.Count == 0) ? 0 : -1;
                 }
                 catch (GitLinkException ex)
                 {
@@ -165,6 +229,70 @@ namespace GitLink
             }
 
             return exitCode.Value;
+        }
+
+        private static bool LinkPdb(string projectPdbFile, Context context, string pdbStrFile, string srctoolFile, string shaHash, string pdbFilesDirectory)
+        {
+            Argument.IsNotNull(() => context);
+
+            try
+            {
+                Log.Info("Handling pdb '{0}'", projectPdbFile);
+
+                var projectSrcSrvFile = projectPdbFile + ".srcsrv";
+
+                var srcSrvContext = new SrcSrvContext
+                {
+                    Revision = shaHash,
+                    RawUrl = context.Provider.RawGitUrl,
+                    DownloadWithPowershell = context.DownloadWithPowershell
+                };
+
+                var missingFiles = ProjectExtensions.VerifyPdbFiles(null, projectPdbFile, srctoolFile);
+
+                if (!srcSrvContext.RawUrl.Contains("%var2%") && !srcSrvContext.RawUrl.Contains("{0}"))
+                {
+                    srcSrvContext.RawUrl = string.Format("{0}/{{0}}/%var2%", srcSrvContext.RawUrl);
+                }
+
+                foreach (var compilable in missingFiles)
+                {
+                    string relative = compilable.Key.Replace(context.SolutionDirectory, string.Empty);
+                    var relativePathForUrl = ReplaceSlashes(context.Provider, relative);
+                    while (relativePathForUrl.StartsWith("/"))
+                    {
+                        relativePathForUrl = relativePathForUrl.Substring(1, relativePathForUrl.Length - 1);
+                    }
+
+                    srcSrvContext.Paths.Add(new Tuple<string, string>(compilable.Key, relativePathForUrl));
+                }
+
+                // When using the VisualStudioTeamServicesProvider, add extra infomration to dictionary with VSTS-specific data
+                if (context.Provider.GetType().Name.EqualsIgnoreCase("VisualStudioTeamServicesProvider"))
+                {
+                    srcSrvContext.VstsData["TFS_COLLECTION"] = context.Provider.CompanyUrl;
+                    srcSrvContext.VstsData["TFS_TEAM_PROJECT"] = context.Provider.ProjectName;
+                    srcSrvContext.VstsData["TFS_REPO"] = context.Provider.ProjectUrl;
+                }
+
+                ProjectExtensions.CreateSrcSrv(projectSrcSrvFile, srcSrvContext);
+
+                Log.Debug("Created source server link file, updating pdb file '{0}'", context.GetRelativePath(projectPdbFile));
+
+                PdbStrHelper.Execute(pdbStrFile, projectPdbFile, projectSrcSrvFile);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "An error occurred while processing pdb '{0}'", projectPdbFile);
+                throw;
+            }
+            finally
+            {
+                Log.Unindent();
+                Log.Info(string.Empty);
+            }
+
+            return true;
         }
 
         private static bool LinkProject(Context context, Project project, string pdbStrFile, string shaHash, string pathPdbDirectory = null)
@@ -203,7 +331,7 @@ namespace GitLink
                 {
                     Log.Info("Verifying pdb file");
 
-                    var missingFiles = project.VerifyPdbFiles(compilables, projectPdbFile);
+                    var missingFiles = ProjectExtensions.VerifyPdbFiles(compilables, projectPdbFile, null);
                     foreach (var missingFile in missingFiles)
                     {
                         Log.Warning("Missing file '{0}' or checksum '{1}' did not match", missingFile.Key, missingFile.Value);
@@ -234,7 +362,7 @@ namespace GitLink
                     srcSrvContext.VstsData["TFS_REPO"] = context.Provider.ProjectUrl;
                 }
 
-                project.CreateSrcSrv(projectSrcSrvFile, srcSrvContext);
+                ProjectExtensions.CreateSrcSrv(projectSrcSrvFile, srcSrvContext);
 
                 Log.Debug("Created source server link file, updating pdb file '{0}'", context.GetRelativePath(projectPdbFile));
 

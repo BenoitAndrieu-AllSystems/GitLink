@@ -38,12 +38,11 @@ namespace GitLink
 
             var srcsrvFile = GetOutputSrcSrvFile(project);
 
-            CreateSrcSrv(project, srcsrvFile, srcSrvContext);
+            ProjectExtensions.CreateSrcSrv(srcsrvFile, srcSrvContext);
         }
 
-        public static void CreateSrcSrv(this Project project, string srcsrvFile, SrcSrvContext srcSrvContext)
+        public static void CreateSrcSrv(string srcsrvFile, SrcSrvContext srcSrvContext)
         {
-            Argument.IsNotNull(() => project);
             Argument.IsNotNull(() => srcSrvContext);
             Argument.IsNotNullOrWhitespace("rawUrl", srcSrvContext.RawUrl);
             Argument.IsNotNullOrWhitespace("revision", srcSrvContext.Revision);
@@ -66,18 +65,18 @@ namespace GitLink
             return project.Items.Where(x => string.Equals(x.ItemType, "Compile") || string.Equals(x.ItemType, "ClCompile") || string.Equals(x.ItemType, "ClInclude"));
         }
 
-        public static Dictionary<string, string> VerifyPdbFiles(this Project project, IEnumerable<string> files)
+        public static Dictionary<string, string> VerifyPdbFiles(this Project project, IEnumerable<string> files, string srctoolFile)
         {
             Argument.IsNotNull(() => project);
 
             var pdbFile = GetOutputPdbFile(project);
 
-            return VerifyPdbFiles(project, files, pdbFile);
+            return VerifyPdbFiles(files, pdbFile, srctoolFile);
         }
 
-        public static Dictionary<string, string> VerifyPdbFiles(this Project project, IEnumerable<string> files, string pdbFileFullPath)
+        public static Dictionary<string, string> VerifyPdbFiles(IEnumerable<string> files, string pdbFileFullPath, string srctoolFile)
         {
-            using(var pdb = new PdbFile(pdbFileFullPath))
+            using (var pdb = new PdbFile(pdbFileFullPath, srctoolFile))
             {
                 return pdb.VerifyPdbFiles(files);
             }

@@ -101,6 +101,7 @@
     <Compile Include="Helpers\PdbStrHelper.cs" />
     <Compile Include="Helpers\ProjectHelper.cs" />
     <Compile Include="Helpers\ResourceHelper.cs" />
+    <Compile Include="Helpers\SrcToolHelper.cs" />
     <Compile Include="HelpWriter.cs" />
     <Compile Include="Linker.cs" />
     <Compile Include="Logging\OutputLogListener.cs" />
@@ -119,6 +120,7 @@
     <Compile Include="Providers\BitBucketProvider.cs" />
     <Compile Include="Providers\CustomRawUrlProvider.cs" />
     <Compile Include="Providers\CustomUrlProvider.cs" />
+    <Compile Include="Providers\GitDaemonProvider.cs" />
     <Compile Include="Providers\GitHubProvider.cs" />
     <Compile Include="Providers\Interfaces\IBackSlashSupport.cs" />
     <Compile Include="Providers\Interfaces\IProviderManager.cs" />
@@ -134,6 +136,7 @@
   <ItemGroup>
     <EmbeddedResource Include="Resources\Files\pdbstr.exe" />
     <EmbeddedResource Include="Resources\Files\winsdk.redist.txt" />
+    <EmbeddedResource Include="Resources\Files\srctool.exe" />
     <Content Include="Resources\Icons\Logo.ico" />
     <Content Include="FodyWeavers.xml">
       <SubType>Designer</SubType>
