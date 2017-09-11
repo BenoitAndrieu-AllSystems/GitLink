@@ -32,16 +32,32 @@ namespace GitLink.Pdb
                 
                     sw.WriteLine("SRCSRV: ini ------------------------------------------------");
                     sw.WriteLine("VERSION=2");
-                    sw.WriteLine("SRCSRV: variables ------------------------------------------");                    
+                    sw.WriteLine("SRCSRV: variables ------------------------------------------");
                     sw.WriteLine("RAWURL={0}", CreateTarget(rawUrl, revision));
+                    sw.WriteLine("GITREVISION={0}", revision);
                     if (rawUrl.ToLowerInvariant().StartsWith("git://") == true)
                     {
-                        sw.WriteLine("TRGFILE=%fnbksl%(%targ%\\%var2%)");
+                        //// fnbksl => All forward slashes (/) in the parameter text should be replaced with backward slashes (\).
+
+                        // Full path to source file after having been retrieved from source server
+                        sw.WriteLine("TRGFILE=%fnbksl%(%targ%\\%GITREVISION%\\%var2%)");
+
+                        // Full path to zip file containing original source file
                         sw.WriteLine("TMPZIP=%fnbksl%(%targ%\\%fnfile%(%var2%)).zip");
+
+                        // MSDN : Describes how to build the target path for the extracted file.This is a required variable.
                         sw.WriteLine("SRCSRVTRG=%TRGFILE%");
+
+                        // Download zip file containing original source file
                         sw.WriteLine("CMDGITARCHIVE=git.exe archive --format zip --remote %RAWURL% -o \"%TMPZIP%\"");
-                        sw.WriteLine("CMDUNZIP=powershell invoke-command -scriptblock {}; Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::ExtractToDirectory('%TMPZIP%', '%targ%');");
+
+                        // Unzip
+                        sw.WriteLine("CMDUNZIP=powershell invoke-command -scriptblock {}; Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::ExtractToDirectory('%TMPZIP%', '%targ%\\%GITREVISION%');");
+
+                        // Delete zip
                         sw.WriteLine("CMDDELZIP=del \"%TMPZIP%\"\"");
+
+                        // MSDN : Describes how to build the command to extract the file from source control. This includes the name of the executable file and its command-line parameters. This is a required variable.
                         sw.WriteLine("SRCSRVCMD=cmd /c \"%CMDGITARCHIVE% && %CMDUNZIP% && %CMDDELZIP%");
                     }
                     else if(downloadWithPowershell)
