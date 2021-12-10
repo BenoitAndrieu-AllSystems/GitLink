@@ -85,7 +85,7 @@ namespace GitLink
                         {
                             try
                             {
-                                if (!LinkPdb(pdbFile, context, pdbStrFile, srctoolFile, shaHash, context.PdbFilesDirectory))
+                                if (!LinkPdb(pdbFile, context, pdbStrFile, srctoolFile, shaHash, context.PdbFilesDirectory, context.SrcToolMask))
                                 {
                                     failedPdbs.Add(pdbFile);
                                 }
@@ -231,7 +231,7 @@ namespace GitLink
             return exitCode.Value;
         }
 
-        private static bool LinkPdb(string projectPdbFile, Context context, string pdbStrFile, string srctoolFile, string shaHash, string pdbFilesDirectory)
+        private static bool LinkPdb(string projectPdbFile, Context context, string pdbStrFile, string srctoolFile, string shaHash, string pdbFilesDirectory, string srcToolMask)
         {
             Argument.IsNotNull(() => context);
 
@@ -248,7 +248,7 @@ namespace GitLink
                     DownloadWithPowershell = context.DownloadWithPowershell
                 };
 
-                var missingFiles = ProjectExtensions.VerifyPdbFiles(null, projectPdbFile, srctoolFile);
+                var missingFiles = ProjectExtensions.VerifyPdbFiles(null, projectPdbFile, srctoolFile, srcToolMask);
 
                 if (!srcSrvContext.RawUrl.Contains("%var2%") && !srcSrvContext.RawUrl.Contains("{0}"))
                 {
@@ -275,11 +275,14 @@ namespace GitLink
                     srcSrvContext.VstsData["TFS_REPO"] = context.Provider.ProjectUrl;
                 }
 
-                ProjectExtensions.CreateSrcSrv(projectSrcSrvFile, srcSrvContext);
+                if (srcSrvContext.Paths != null && srcSrvContext.Paths.Count > 0)
+                {
+                    ProjectExtensions.CreateSrcSrv(projectSrcSrvFile, srcSrvContext);
 
-                Log.Debug("Created source server link file, updating pdb file '{0}'", context.GetRelativePath(projectPdbFile));
+                    Log.Debug("Created source server link file, updating pdb file '{0}'", context.GetRelativePath(projectPdbFile));
 
-                PdbStrHelper.Execute(pdbStrFile, projectPdbFile, projectSrcSrvFile);
+                    PdbStrHelper.Execute(pdbStrFile, projectPdbFile, projectSrcSrvFile);
+                }
             }
             catch (Exception ex)
             {
@@ -331,7 +334,7 @@ namespace GitLink
                 {
                     Log.Info("Verifying pdb file");
 
-                    var missingFiles = ProjectExtensions.VerifyPdbFiles(compilables, projectPdbFile, null);
+                    var missingFiles = ProjectExtensions.VerifyPdbFiles(compilables, projectPdbFile, null, null);
                     foreach (var missingFile in missingFiles)
                     {
                         Log.Warning("Missing file '{0}' or checksum '{1}' did not match", missingFile.Key, missingFile.Value);

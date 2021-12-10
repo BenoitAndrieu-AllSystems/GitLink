@@ -158,6 +158,12 @@ namespace GitLink
                     continue;
                 }
 
+                if (IsSwitch("srctoolmask", name))
+                {
+                    context.SrcToolMask = value;
+                    continue;
+                }
+
                 throw Log.ErrorAndCreateException<GitLinkException>("Could not parse command line parameter '{0}'.", name);
             }
 

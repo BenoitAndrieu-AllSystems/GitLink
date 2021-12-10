@@ -134,7 +134,19 @@ namespace GitLink
 
             foreach (var file in pdbFile.GetFiles())
             {
-                checksums.Add(file.Item1, file.Item2 == null ? null : Hex.Encode(file.Item2));
+                var hexed = file.Item2 == null ? null : Hex.Encode(file.Item2);
+                string item2;
+                if (checksums.TryGetValue(file.Item1, out item2) == true)
+                {
+                    if (item2 != hexed)
+                    {
+                        throw new Exception();
+                    }
+
+                    continue;
+                }
+
+                checksums.Add(file.Item1, hexed);
             }
 
             return checksums;

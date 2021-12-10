@@ -48,6 +48,11 @@ namespace GitLink
             Argument.IsNotNullOrWhitespace("revision", srcSrvContext.Revision);
             Argument.IsNotNullOrWhitespace(() => srcsrvFile);
 
+            if (srcSrvContext.Paths == null || srcSrvContext.Paths.Count == 0)
+            {
+                return;
+            }
+
             if (srcSrvContext.VstsData.Count != 0)
             {
                 File.WriteAllBytes(srcsrvFile, SrcSrv.CreateVsts(srcSrvContext.Revision, srcSrvContext.Paths, srcSrvContext.VstsData));
@@ -65,18 +70,18 @@ namespace GitLink
             return project.Items.Where(x => string.Equals(x.ItemType, "Compile") || string.Equals(x.ItemType, "ClCompile") || string.Equals(x.ItemType, "ClInclude"));
         }
 
-        public static Dictionary<string, string> VerifyPdbFiles(this Project project, IEnumerable<string> files, string srctoolFile)
+        public static Dictionary<string, string> VerifyPdbFiles(this Project project, IEnumerable<string> files, string srctoolFile, string srcToolMask)
         {
             Argument.IsNotNull(() => project);
 
             var pdbFile = GetOutputPdbFile(project);
 
-            return VerifyPdbFiles(files, pdbFile, srctoolFile);
+            return VerifyPdbFiles(files, pdbFile, srctoolFile, srcToolMask);
         }
 
-        public static Dictionary<string, string> VerifyPdbFiles(IEnumerable<string> files, string pdbFileFullPath, string srctoolFile)
+        public static Dictionary<string, string> VerifyPdbFiles(IEnumerable<string> files, string pdbFileFullPath, string srctoolFile, string srcToolMask)
         {
-            using (var pdb = new PdbFile(pdbFileFullPath, srctoolFile))
+            using (var pdb = new PdbFile(pdbFileFullPath, srctoolFile, srcToolMask))
             {
                 return pdb.VerifyPdbFiles(files);
             }

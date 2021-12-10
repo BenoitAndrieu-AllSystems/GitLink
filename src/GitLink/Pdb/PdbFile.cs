@@ -26,7 +26,7 @@
         private readonly SortedSet<int> _freePages;
         private readonly byte[] _zerosPage;
 
-        public PdbFile(string path, string srctoolFile)
+        public PdbFile(string path, string srctoolFile, string srcToolMask)
         {
             Argument.IsNotNullOrWhitespace(() => path);
 
@@ -34,7 +34,7 @@
 
             if (string.IsNullOrEmpty(srctoolFile) == false)
             {
-                SrcToolFiles = SrcToolHelper.Execute(srctoolFile, path);
+                SrcToolFiles = SrcToolHelper.Execute(srctoolFile, path, srcToolMask);
             }
 
             _fs = File.Open(path, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite);

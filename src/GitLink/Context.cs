@@ -105,6 +105,8 @@ namespace GitLink
 
         public string PdbFilesDirectory { get; set; }
 
+        public string SrcToolMask { get; set; }
+
         public void ValidateContext()
         {
             if (!string.IsNullOrWhiteSpace(SolutionDirectory))
